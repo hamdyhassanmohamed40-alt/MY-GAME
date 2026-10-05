@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>مهمة إنقاذ المستكشف: الكشوف الجغرافية للعالم الجديد</title>
+    <!-- Tailwind CSS for modern layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&family=Fredoka:wght@600;700&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti for winning animation -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        * {
+            font-family: 'Tajawal', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            background-color: #f6f8fa;
+            background-image: 
+                radial-gradient(#e0e7ff 1.5px, transparent 1.5px),
+                radial-gradient(#e0e7ff 1.5px, #f6f8fa 1.5px);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            overflow-x: hidden;
+        }
+        
+        .board-card {
+            background: rgba(255, 255, 255, 0.95);
+            border: 4px solid #7c3aed;
+            box-shadow: 0 20px 40px rgba(124, 58, 237, 0.15), inset 0 0 15px rgba(255,255,255,0.8);
+            border-radius: 28px;
+        }
+
+        .btn-3d {
+            transition: all 0.15s ease;
+            box-shadow: 0 6px 0 var(--btn-shadow-color, #4c1d95), 0 10px 15px rgba(0,0,0,0.2);
+            position: relative;
+            top: 0;
+        }
+        .btn-3d:active {
+            top: 4px;
+            box-shadow: 0 2px 0 var(--btn-shadow-color, #4c1d95), 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .tile-node {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .tile-node:hover {
+            transform: scale(1.15) translateY(-4px);
+        }
+
+        /* Rope Marker Nodes */
+        .rope-node {
+            transition: all 0.3s ease;
+        }
+        .rope-node.active {
+            background-color: #10b981;
+            border-color: #047857;
+            box-shadow: 0 0 12px #34d399;
+            transform: scale(1.2);
+        }
+
+        @keyframes ropeTighten {
+            0% { stroke-dashoffset: 20; stroke: #f59e0b; }
+            50% { stroke-dashoffset: 0; stroke: #10b981; stroke-width: 9; }
+            100% { stroke-dashoffset: 0; stroke: #d97706; stroke-width: 7; }
+        }
+
+        @keyframes carSlideBack {
+            0% { transform: translateY(0) rotate(0deg); }
+            20% { transform: translateY(8px) rotate(-3deg); }
+            40% { transform: translateY(14px) rotate(4deg); }
+            100% { transform: translateY(10px) rotate(0deg); }
+        }
+
+        @keyframes ropeShake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px) rotate(-1deg); }
+            40%, 80% { transform: translateX(6px) rotate(1deg); }
+        }
+
+        .animate-rope-pull {
+            animation: ropeTighten 0.8s ease-in-out;
+        }
+        .animate-car-slide {
+            animation: carSlideBack 0.6s ease-in-out;
+        }
+        .animate-rope-shake {
+            animation: ropeShake 0.5s ease-in-out;
+        }
+
+        /* Custom scrollbar for game board */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f3f4f6;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c084fc;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 p-2 sm:p-4 flex flex-col items-center justify-between">
+
+    <header class="w-full max-w-6xl flex flex-wrap items-center justify-between gap-3 bg-white/90 backdrop-blur border-2 border-indigo-200 rounded-2xl p-3 shadow-md mb-3">
+        <div class="flex items-center gap-3">
+            <div class="bg-amber-500 text-white p-3 rounded-xl shadow-lg flex items-center justify-center font-black text-2xl border-2 border-amber-600">
+                🚜
+            </div>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black text-indigo-900 leading-tight">مهمة إنقاذ المستكشف</h1>
+                <p class="text-xs sm:text-sm font-bold text-amber-600">الكشوف الجغرافية للعالم الجديد 🗺️</p>
+            </div>
+        </div>
+
+        <!-- Dynamic Game Status & Controls -->
+        <div class="flex items-center gap-2 sm:gap-4">
+            <div class="bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 text-center">
+                <span class="block text-xs text-indigo-500 font-bold">الجولة الحالية</span>
+                <span id="current-round-text" class="text-sm font-black text-indigo-800">الجولة 1: دوافع الكشوف</span>
+            </div>
+
+            <!-- Sound Toggle Button -->
+            <button id="sound-btn" onclick="toggleSound()" class="btn-3d bg-emerald-500 hover:bg-emerald-600 text-white font-bold p-2.5 rounded-xl text-sm flex items-center gap-1.5 border-b-4 border-emerald-700" style="--btn-shadow-color: #047857;">
+                <span id="sound-icon">🔊</span>
+                <span id="sound-text" class="hidden sm:inline">الصوت: مفعل</span>
+            </button>
+
+            <!-- Mode/Reset Button -->
+            <button onclick="openSetupModal()" class="btn-3d bg-slate-600 hover:bg-slate-700 text-white font-bold px-3 py-2 rounded-xl text-sm border-b-4 border-slate-800" style="--btn-shadow-color: #1e293b;">
+                ⚙️ الإعدادات
+            </button>
+        </div>
+    </header>
+
+    <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-4 my-auto">
+        
+        <!-- Left Side: Leaderboard & Stage Map Visual (4 Cols on LG) -->
+        <div class="lg:col-span-4 flex flex-col gap-3">
+            
+            <!-- Leaderboard Card matching uploaded UI Leaderboard -->
+            <div class="bg-gradient-to-b from-amber-50 to-orange-50 border-4 border-amber-400 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+                <div class="flex items-center justify-between border-b-2 border-amber-200 pb-2 mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">🏆</span>
+                        <h2 class="font-black text-amber-900 text-lg">لوحة المتصدرين (UI Leaderboard)</h2>
+                    </div>
+                    <span id="game-mode-badge" class="bg-amber-200 text-amber-900 text-xs font-bold px-2 py-0.5 rounded-full">نمط الفرق</span>
+                </div>
+
+                <div id="leaderboard-list" class="space-y-2.5">
+                    <!-- Teams/Players dynamic injection -->
+                </div>
+            </div>
+
+            <!-- Round Progress Bar matching Top Image Graphic -->
+            <div class="bg-white border-2 border-indigo-200 rounded-2xl p-3 shadow-sm">
+                <div class="flex justify-between items-center mb-1 text-xs font-bold text-indigo-900">
+                    <span>مراحل إنقاذ السيارة</span>
+                    <span id="rescue-percent-text">0%</span>
+                </div>
+                
+                <!-- Stage 1-4 Graphic Steps -->
+                <div class="grid grid-cols-4 gap-1 mb-2">
+                    <div id="stage-box-1" class="h-8 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500 transition-all">1</div>
+                    <div id="stage-box-2" class="h-8 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500 transition-all">2</div>
+                    <div id="stage-box-3" class="h-8 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500 transition-all">3</div>
+                    <div id="stage-box-4" class="h-8 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500 transition-all">🏁 تم</div>
+                </div>
+
+                <!-- Overall Progress Line -->
+                <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden border border-slate-300">
+                    <div id="main-progress-bar" class="bg-gradient-to-r from-amber-400 via-emerald-400 to-emerald-600 h-full w-0 transition-all duration-500"></div>
+                </div>
+            </div>
+
+            <!-- Rope Marks Visual Tracker -->
+            <div class="bg-amber-50/80 border-2 border-amber-300 rounded-2xl p-3 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-black text-amber-900 flex items-center gap-1">
+                        🧶 عقد حبل الإنقاذ (Rope Markers):
+                    </span>
+                    <span id="rope-counter" class="text-xs font-bold text-amber-700">0 / 18 عقدة</span>
+                </div>
+                <div id="rope-nodes-container" class="grid grid-cols-9 gap-1.5 justify-center">
+                    <!-- 18 Rope nodes injected dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Interactive Board Graphic with Mud Hole & Rescue Jeep (8 Cols on LG) -->
+        <div class="lg:col-span-8 flex flex-col gap-3">
+            
+            <!-- Main Game Board Container matching uploaded image style -->
+            <div class="board-card relative min-h-[380px] sm:min-h-[440px] p-4 flex flex-col justify-between overflow-hidden bg-gradient-to-br from-blue-50 via-emerald-50 to-amber-50">
+                
+                <!-- Stylized World Map Background Canvas Effect -->
+                <div class="absolute inset-0 opacity-15 pointer-events-none flex items-center justify-center">
+                    <svg class="w-full h-full" viewBox="0 0 800 500" fill="none">
+                        <path d="M100 150 Q 180 80 280 160 T 400 200 T 550 120 T 700 220" stroke="#2563eb" stroke-width="12" stroke-dasharray="8 8"/>
+                        <path d="M80 300 C 150 250, 220 380, 320 320 C 420 260, 500 420, 680 360" stroke="#059669" stroke-width="8"/>
+                        <circle cx="200" cy="120" r="40" fill="#3b82f6" opacity="0.3"/>
+                        <circle cx="500" cy="350" r="60" fill="#10b981" opacity="0.3"/>
+                    </svg>
+                </div>
+
+                <!-- Top Board Banner Title -->
+                <div class="relative z-10 flex flex-wrap justify-between items-center bg-white/80 backdrop-blur rounded-xl p-2 px-3 border border-indigo-100 shadow-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">🧭</span>
+                        <span id="turn-indicator" class="font-black text-indigo-950 text-sm sm:text-base">دور: الفريق الأول</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-1 rounded-lg border border-emerald-300" id="challenge-step-badge">
+                            التحدي 1 من 18
+                        </span>
+                    </div>
+                </div>
+
+                <div class="relative z-10 my-2 flex-grow grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                    
+                    <!-- Left: Path Track Visual (5 cols) -->
+                    <div class="md:col-span-5 flex flex-col justify-center gap-2">
+                        <div class="text-xs font-black text-slate-600 bg-white/70 p-2 rounded-xl border border-slate-200">
+                            📍 خريطة المسار المستكشف:
+                        </div>
+                        <!-- Path nodes preview -->
+                        <div class="grid grid-cols-3 gap-2 text-center text-xs font-bold">
+                            <div id="tile-1" class="tile-node p-2 rounded-xl bg-amber-400 text-amber-950 border-2 border-amber-600 shadow">1. دوافع</div>
+                            <div id="tile-2" class="tile-node p-2 rounded-xl bg-sky-400 text-sky-950 border-2 border-sky-600 shadow">2. المسلمون</div>
+                            <div id="tile-3" class="tile-node p-2 rounded-xl bg-purple-400 text-purple-950 border-2 border-purple-600 shadow">3. كولومبوس</div>
+                            <div id="tile-4" class="tile-node p-2 rounded-xl bg-indigo-400 text-indigo-950 border-2 border-indigo-600 shadow">4. ماجلان</div>
+                            <div id="tile-5" class="tile-node p-2 rounded-xl bg-emerald-400 text-emerald-950 border-2 border-emerald-600 shadow">5. كوك</div>
+                            <div id="tile-6" class="tile-node p-2 rounded-xl bg-rose-400 text-rose-950 border-2 border-rose-600 shadow">6. النتائج</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Mud Hole Scene with Animated Rescue Car (7 cols) -->
+                    <div class="md:col-span-7 relative h-56 sm:h-64 bg-gradient-to-b from-sky-200 via-amber-100 to-amber-200 rounded-2xl border-4 border-amber-700 shadow-inner overflow-hidden flex flex-col justify-end p-2">
+                        
+                        <!-- Sky & Crane Top Bar -->
+                        <div class="absolute top-0 inset-x-0 h-16 flex justify-between items-start p-2 pointer-events-none">
+                            <div class="text-xs font-black text-amber-900 bg-amber-200/90 px-2.5 py-1 rounded-lg border border-amber-400 shadow">
+                                🏗️ رافعة الإنقاذ الكبرى
+                            </div>
+                            <div id="speech-bubble" class="hidden bg-white text-rose-600 font-black text-xs px-3 py-1.5 rounded-full shadow-lg border-2 border-rose-400 animate-bounce">
+                                Help! ساعدوني! 🆘
+                            </div>
+                        </div>
+
+                        <!-- Mud Hole Pit Visual -->
+                        <div class="absolute bottom-0 inset-x-0 h-40 bg-amber-950/90 rounded-t-3xl border-t-8 border-amber-800 shadow-2xl flex flex-col items-center justify-end">
+                            <div class="w-full h-full bg-amber-900/60 rounded-t-3xl p-2 relative overflow-hidden">
+                                <!-- Mud textures -->
+                                <div class="absolute top-2 left-4 w-12 h-3 bg-amber-950 rounded-full opacity-60"></div>
+                                <div class="absolute top-6 right-8 w-16 h-4 bg-amber-950 rounded-full opacity-50"></div>
+                            </div>
+                        </div>
+
+                        <!-- Crane Cable Line (SVG) -->
+                        <svg class="absolute inset-0 w-full h-full pointer-events-none z-10" id="crane-svg">
+                            <line id="rope-line" x1="80%" y1="15%" x2="50%" y2="70%" stroke="#d97706" stroke-width="7" stroke-dasharray="6 2" class="transition-all duration-700"/>
+                        </svg>
+
+                        <div id="car-container" class="relative z-20 transition-all duration-700 ease-out mx-auto w-40 sm:w-48" style="transform: translateY(20px);">
+                            <div class="relative flex flex-col items-center">
+                                <!-- Pulley Hook -->
+                                <div class="w-4 h-6 bg-slate-700 rounded-b-md border border-slate-900 -mb-1 shadow"></div>
+                                
+                                <!-- Cute Cartoon 4x4 Rescue Jeep matching uploaded image -->
+                                <div id="jeep-graphic" class="w-36 sm:w-44 h-20 sm:h-24 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 rounded-2xl border-4 border-amber-900 shadow-xl relative p-1 flex flex-col justify-between">
+                                    <!-- Roof Rack with luggage -->
+                                    <div class="absolute -top-3 inset-x-4 h-3 bg-slate-800 rounded-md flex justify-around items-center px-1 border border-slate-900">
+                                        <div class="w-4 h-2 bg-rose-500 rounded-sm"></div>
+                                        <div class="w-5 h-2 bg-blue-500 rounded-sm"></div>
+                                        <div class="w-3 h-2 bg-emerald-500 rounded-sm"></div>
+                                    </div>
+                                    
+                                    <!-- Windows & Eyes -->
+                                    <div class="bg-sky-200 h-8 rounded-lg border-2 border-amber-900 flex justify-around items-center px-2 mt-1">
+                                        <!-- Cute Cartoon Eyes -->
+                                        <div id="car-eye-left" class="w-3 h-4 bg-white rounded-full border border-slate-800 flex items-center justify-center">
+                                            <div class="w-1.5 h-1.5 bg-slate-900 rounded-full"></div>
+                                        </div>
+                                        <div id="car-eye-right" class="w-3 h-4 bg-white rounded-full border border-slate-800 flex items-center justify-center">
+                                            <div class="w-1.5 h-1.5 bg-slate-900 rounded-full"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Mud Splatters on Car -->
+                                    <div class="absolute bottom-1 left-2 w-6 h-3 bg-amber-950/70 rounded-full"></div>
+                                    <div class="absolute bottom-2 right-4 w-8 h-2 bg-amber-950/60 rounded-full"></div>
+
+                                    <!-- Big SUV Wheels -->
+                                    <div class="absolute -bottom-3 inset-x-2 flex justify-between px-1">
+                                        <div class="w-7 h-7 bg-slate-900 rounded-full border-2 border-slate-400 flex items-center justify-center shadow-md animate-spin-slow">
+                                            <div class="w-2 h-2 bg-slate-300 rounded-full"></div>
+                                        </div>
+                                        <div class="w-7 h-7 bg-slate-900 rounded-full border-2 border-slate-400 flex items-center justify-center shadow-md animate-spin-slow">
+                                            <div class="w-2 h-2 bg-slate-300 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Action Launch Button Bar -->
+                <div class="relative z-10 flex items-center justify-center gap-3 pt-2">
+                    <button id="open-challenge-btn" onclick="presentCurrentChallenge()" class="btn-3d w-full sm:w-auto bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-lg px-8 py-3.5 rounded-2xl border-b-4 border-orange-800 shadow-xl flex items-center justify-center gap-2" style="--btn-shadow-color: #9a3412;">
+                        <span>🧩</span>
+                        <span>بدء تحدي الإنقاذ التالي!</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <div id="challenge-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white border-4 border-indigo-500 rounded-3xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between border-b-2 border-indigo-100 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <span id="challenge-type-icon" class="text-2xl">🚨</span>
+                    <div>
+                        <h3 id="challenge-title" class="font-black text-indigo-950 text-base sm:text-lg">مهمة إنقاذ عاجلة!</h3>
+                        <p id="challenge-subtitle" class="text-xs font-bold text-indigo-500">استخدم معلومات الدرس لتجاوز الخطر</p>
+                    </div>
+                </div>
+                <div class="bg-amber-100 text-amber-900 font-black text-xs px-3 py-1 rounded-full border border-amber-300">
+                    +100 قوة إنقاذ ⭐
+                </div>
+            </div>
+
+            <!-- Challenge Context Scenario Body -->
+            <div id="challenge-body-container" class="space-y-4 mb-6">
+                <!-- Question text and dynamic interactive controls inserted here -->
+            </div>
+
+            <!-- Answer Feedback Alert Container -->
+            <div id="feedback-box" class="hidden rounded-2xl p-4 border-2 mb-4 text-center text-sm font-bold animate-fade-in">
+                <!-- Dynamic correct/incorrect feedback -->
+            </div>
+
+            <div class="flex justify-end gap-3 border-t-2 border-slate-100 pt-4">
+                <button id="submit-answer-btn" onclick="evaluateAnswer()" class="btn-3d bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-3 rounded-2xl border-b-4 border-indigo-900 w-full sm:w-auto" style="--btn-shadow-color: #1e1b4b;">
+                    تأكيد الإجابة 🎯
+                </button>
+
+                <!-- Suspense Pull Button -->
+                <button id="trigger-rescue-btn" onclick="executeRescueAnimation()" class="hidden btn-3d bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-base sm:text-lg px-8 py-3.5 rounded-2xl border-b-4 border-teal-900 w-full shadow-lg animate-pulse" style="--btn-shadow-color: #134e4a;">
+                    🚀 شاهد حركة الإنقاذ واسحب السيارة!
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="setup-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white border-4 border-amber-500 rounded-3xl max-w-lg w-full p-6 shadow-2xl">
+            <h2 class="text-xl font-black text-indigo-950 mb-1 flex items-center gap-2">
+                ⚙️ إعدادات مهمة الإنقاذ
+            </h2>
+            <p class="text-xs font-bold text-slate-500 mb-4">اختر نمط اللعب وأسماء الفرق للبدء</p>
+
+            <div class="space-y-4">
+                <!-- Mode Select -->
+                <div>
+                    <label class="block text-xs font-black text-indigo-900 mb-1">نمط اللعب:</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="mode-team-btn" onclick="setGameMode('team')" class="p-3 rounded-xl border-2 border-amber-500 bg-amber-50 font-bold text-amber-900 text-sm flex flex-col items-center gap-1">
+                            <span>👥</span>
+                            <span>نمط الفرق</span>
+                        </button>
+                        <button id="mode-single-btn" onclick="setGameMode('single')" class="p-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-bold text-slate-700 text-sm flex flex-col items-center gap-1">
+                            <span>👤</span>
+                            <span>فردي</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Teams Input -->
+                <div id="team-names-section">
+                    <label class="block text-xs font-black text-indigo-900 mb-1">عدد وأسماء الفرق:</label>
+                    <div class="space-y-2">
+                        <input type="text" id="team1-input" value="الفريق الأول (الفرسان)" class="w-full p-2.5 rounded-xl border-2 border-slate-300 font-bold text-sm focus:border-amber-500 outline-none">
+                        <input type="text" id="team2-input" value="الفريق الثاني (المستكشفون)" class="w-full p-2.5 rounded-xl border-2 border-slate-300 font-bold text-sm focus:border-amber-500 outline-none">
+                    </div>
+                </div>
+
+                <button onclick="saveSetupAndStart()" class="btn-3d w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-3 rounded-2xl border-b-4 border-emerald-800 text-base" style="--btn-shadow-color: #065f46;">
+                    انطلق إلى المهمة! 🚀
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="victory-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gradient-to-b from-amber-50 via-white to-emerald-50 border-4 border-amber-400 rounded-3xl max-w-md w-full p-6 text-center shadow-2xl relative">
+            <div class="text-6xl mb-2 animate-bounce">🏆</div>
+            <h2 class="text-2xl font-black text-amber-900 mb-1">تم إنقاذ السيارة بالكامل!</h2>
+            <p class="text-sm font-bold text-emerald-700 mb-4">"You saved me! شكراً لجهودكم العظيمة!" 🎉</p>
+            
+            <div id="victory-stats" class="bg-white border-2 border-amber-200 rounded-2xl p-4 shadow-sm mb-6 text-right space-y-2 text-sm font-bold">
+                <!-- Injected stats -->
+            </div>
+
+            <button onclick="resetWholeGame()" class="btn-3d w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black py-3 rounded-2xl border-b-4 border-orange-800" style="--btn-shadow-color: #9a3412;">
+                لعب مهمة جديدة 🔄
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let soundEnabled = true;
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioCtx();
+            }
+        }
+
+        function playSFX(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+
+                if (type === 'click') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.08);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } 
+                else if (type === 'correct') {
+                    // Success Chime (Arpeggio)
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.25, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.25);
+                    });
+                } 
+                else if (type === 'wrong') {
+                    // Slide Down Warning Sound
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(280, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.35);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } 
+                else if (type === 'rope_pull') {
+                    // Engine & Winch tension sound
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.linearRampToValueAtTime(320, now + 0.4);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                }
+                else if (type === 'victory') {
+                    // Celebration fanfare
+                    [440, 554.37, 659.25, 880, 1108.73].forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.3, now + idx * 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.4);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.12);
+                        osc.stop(now + idx * 0.12 + 0.4);
+                    });
+                }
+            } catch (e) {
+                console.log("Audio play error", e);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-text').innerText = soundEnabled ? 'الصوت: مفعل' : 'الصوت: مكتوم';
+            document.getElementById('sound-icon').innerText = soundEnabled ? '🔊' : '🔇';
+            playSFX('click');
+        }
+
+        const gameQuestions = [
+            // ROUND 1: دوافع الكشوف وعواملها (Questions 1 - 6)
+            {
+                id: 1,
+                round: 1,
+                type: 'mcq',
+                title: 'تحديد دوافع الطريق التجاري البديل 🚢',
+                scenario: 'حبل الإنقاذ يحتاج إلى تثبيت! أراد الأوروبيون الوصول إلى الهند دون المرور بطريق الحرير أو الأراضي المملوكية والعثمانية. ما السبب الدافع لذلك؟',
+                options: [
+                    { text: 'لتجنب دفع رسوم مرور التجارة الباهظة', correct: true },
+                    { text: 'لأن الطرق البحرية كانت أقصر دائماً', correct: false },
+                    { text: 'بسبب رغبتهم في استكشاف القطب الشمالي', correct: false }
+                ],
+                explanation: 'صحيح! سعت الدول الأوروبية للوصول إلى الهند وشرق آسيا دون دفع رسوم المرور للتجار والمماليك والعثمانيين.'
+            },
+            {
+                id: 2,
+                round: 1,
+                type: 'mcq',
+                title: 'أدوات الملاحة والإنقاذ 🧭',
+                scenario: 'الرافعة تحتاج لأدوات ملاحية دقيقة. أيٌّ مما يلي كان من العوامل العلمية المباشرة في نجاح الكشوف الجغرافية؟',
+                options: [
+                    { text: 'التقدم في علم الرياضيات والفلك وتطور الأدوات الملاحية', correct: true },
+                    { text: 'اعتماد المستكشفين على الحظ بدون خرائط', correct: false },
+                    { text: 'إلغاء استخدام السفن والاعتماد على القوارب الصغيرة', correct: false }
+                ],
+                explanation: 'ممتاز! أسهم التقدم في الرياضيات والفلك وتطور السفن والأدوات الملاحية في تحديد الاتجاهات والمواقع بدقة.'
+            },
+            {
+                id: 3,
+                round: 1,
+                type: 'spot_error',
+                title: 'اكتشاف الخطأ في اللوحة الملاحية ⚠️',
+                scenario: 'شاشة التحكم تظهر خطأً في دوافع الكشوف الجغرافية السياسية. حدد الجملة الخاطئة لتصحيح المسار:',
+                options: [
+                    { text: 'تتنافس البرتغال وإسبانيا لتكوين إمبراطوريات استعمارية', correct: false },
+                    { text: 'ارتبطت قوة الدولة بما تملكه من مستعمرات خارج حدودها', correct: false },
+                    { text: 'كان الهدف السياسي من الكشوف الجغرافية هو تسليم الأراضي للمماليك', correct: true }
+                ],
+                explanation: 'أحسنت! الدوافع السياسية كانت التنافس الاستعماري بين الدول الأوروبية وتكوين إمبراطوريات خارج أوروبا.'
+            },
+            {
+                id: 4,
+                round: 1,
+                type: 'mcq',
+                title: 'البحث عن المعادن الثمينة 🪙',
+                scenario: 'محرك الرافعة يطلب وقود المعادن! ما هي المعادن النفيسة التي سعت الدول الأوروبية لزيادة ثرواتها منها لسك النقود؟',
+                options: [
+                    { text: 'الذهب والفضة', correct: true },
+                    { text: 'الحديد والمنجنيز', correct: false },
+                    { text: 'النحاس والفسفاط', correct: false }
+                ],
+                explanation: 'رائع! سعت الدول الأوروبية لزيادة ثرواتها من الذهب والفضة لسك النقود والحصول على السلع الثمينة كالتوابل.'
+            },
+            {
+                id: 5,
+                round: 1,
+                type: 'matching',
+                title: 'إسهامات العلماء المسلمين 🕌',
+                scenario: 'الرافعة تستخدم تقنيات إسلامية ملاحية! كيف استفاد الأوروبيون من العلماء والرحالة المسلمين مثل أحمد بن ماجد؟',
+                options: [
+                    { text: 'تأكيد كروية الأرض وتطوير الخرائط وأدوات مثل البوصلة والإسطرلاب', correct: true },
+                    { text: 'صناعة المحركات البخارية للسفن', correct: false },
+                    { text: 'منع الأوروبيين من الإبحار في المحيط الأطلنطي', correct: false }
+                ],
+                explanation: 'صحيح جداً! طور العلماء المسلمون الإسطرلاب والبوصلة وأكدوا كروية الأرض مما شجع كولومبوس على الإبحار غرباً.'
+            },
+            {
+                id: 6,
+                round: 1,
+                type: 'mcq',
+                title: 'تجاوز عائق طريق الحرير 🐪',
+                scenario: 'طريق السيارة مسدود بالصخور! ما الطريق التجاري البري القديم الذي أراد الأوروبيون التخلي عنه؟',
+                options: [
+                    { text: 'طريق الحرير البري', correct: true },
+                    { text: 'طريق البخور الساحلي', correct: false },
+                    { text: 'طريق رأس الرجاء الصالح', correct: false }
+                ],
+                explanation: 'إجابة صحيحة! أراد الأوروبيون تحاشي المرور عبر طريق الحرير البري لتجنب الرسوم.'
+            },
+
+            // ROUND 2: المستكشفون والأمريكتان وأستراليا (Questions 7 - 12)
+            {
+                id: 7,
+                round: 2,
+                type: 'mcq',
+                title: 'رحلة كريستوفر كولومبوس ⛵',
+                scenario: 'المستكشف كولومبوس أبحر غرباً عبر المحيط الأطلنطي بتمويل من ملك إسبانيا. أين وصل في رحلته الأولى؟',
+                options: [
+                    { text: 'وصل إلى جُزر البهاما واعتبرها جزءاً من آسيا', correct: true },
+                    { text: 'وصل إلى قارة أستراليا ورسم خرائطها', correct: false },
+                    { text: 'وصل إلى القطب الجنوبي', correct: false }
+                ],
+                explanation: 'ممتاز! وصل كولومبوس إلى جزر البهاما عام 1492م وظن أنه وصل إلى الساحل الشرقي لآسيا.'
+            },
+            {
+                id: 8,
+                round: 2,
+                type: 'mcq',
+                title: 'تسمية قارة أمريكا 🗺️',
+                scenario: 'لماذا أطلق الجغرافيون اسم "أمريكا" على القارتين الجديدتين؟',
+                options: [
+                    { text: 'نسبة للمستكشف أميريجو فسبوتشي الذي أثبت أنهما عالم جديد وليسا آسيا', correct: true },
+                    { text: 'نسبة إلى كريستوفر كولومبوس', correct: false },
+                    { text: 'نسبة لملك إسبانيا', correct: false }
+                ],
+                explanation: 'أحسنت! أثبت أميريجو فسبوتشي أن الأراضي المكتشفة قارة مستقرة وليست آسيا، فسميت باسمه تقديراً لجهوده.'
+            },
+            {
+                id: 9,
+                round: 2,
+                type: 'sequence',
+                title: 'مسار رحلة ماجلان التاريخية 🌀',
+                scenario: 'رتب محطات رحلة ماجلان حتى الوصول إلى الدليل العلمي لكروية الأرض:',
+                options: [
+                    { text: 'المحيط الأطلنطي ← مضيق ماجلان ← المحيط الهادي ← جُزر الفلبين', correct: true },
+                    { text: 'المحيط الهادي ← المحيط الهندي ← جزر البهاما', correct: false },
+                    { text: 'أستراليا ← البحر المتوسط ← المحيط الأطلنطي', correct: false }
+                ],
+                explanation: 'صحيح! عبر ماجلان الأطلنطي ثم المضيق في جنوب أمريكا الجنوبية إلى الهادي ووصل إلى الفلبين.'
+            },
+            {
+                id: 10,
+                round: 2,
+                type: 'mcq',
+                title: 'تسمية المحيط الهادي 🌊',
+                scenario: 'لماذا أطلق المستكشف ماجلان اسم "المحيط الهادي" على هذا المحيط العظيم؟',
+                options: [
+                    { text: 'لأن أمواجه بدت هادئة مقارنة بالمحيط الأطلنطي أثناء رحلته', correct: true },
+                    { text: 'لأنه كان خالياً من الأسماك', correct: false },
+                    { text: 'لأن سفنهم توقفت عن الحركة تماماً فيه', correct: false }
+                ],
+                explanation: 'رائع! أطلق عليه هذا الاسم لهدوء أمواجه مقارنة بالعواصف في المحيط الأطلنطي.'
+            },
+            {
+                id: 11,
+                round: 2,
+                type: 'mcq',
+                title: 'أهمية أول دوران حول الأرض 1522م 🌍',
+                scenario: 'أكمل رفاق ماجلان الرحلة بعد وفاته وعادوا إلى إسبانيا عام 1522م. ما الأهمية العلمية لهذه الرحلة؟',
+                options: [
+                    { text: 'قدمت دليلاً عملياً قاطعاً على كروية الأرض', correct: true },
+                    { text: 'أثبتت أن الأرض مسطحة وممتدة', correct: false },
+                    { text: 'اكتشفت قارة أستراليا بالكامل', correct: false }
+                ],
+                explanation: 'ممتاز! حقق رفاق ماجلان أول دوران حول الكرة الأرضية و أثبتوا كرويتها عملياً.'
+            },
+            {
+                id: 12,
+                round: 2,
+                type: 'mcq',
+                title: 'اكتشاف أستراليا وجيمس كوك 🦘',
+                scenario: 'من المستكشف البريطاني الذي وصل للساحل الشرقي لأستراليا عام 1770م ورسم خرائطها ورسخ استيطان بريطانيا بها؟',
+                options: [
+                    { text: 'جيمس كوك', correct: true },
+                    { text: 'أحمد بن ماجد', correct: false },
+                    { text: 'أميريجو فسبوتشي', correct: false }
+                ],
+                explanation: 'صحيح! المستكشف البريطاني جيمس كوك رسم خرائط تفصيلية للساحل الشرقي لأستراليا ممهداً للاستيطان.'
+            },
+
+            // ROUND 3: النتائج والآثار الاقتصادية والاجتماعية (Questions 13 - 18)
+            {
+                id: 13,
+                round: 3,
+                type: 'mcq',
+                title: 'النتائج الاقتصادية للكشوف 💰',
+                scenario: 'حبل الإنقاذ يشد بقوة! كيف تحول المحيط الأطلنطي بعد الكشوف الجغرافية؟',
+                options: [
+                    { text: 'تحول من حاجز مائي إلى طريق رئيسي للتجارة العالمية وتدفق الذهب والفضة', correct: true },
+                    { text: 'أصبح غير صالح للملاحة تماماً', correct: false },
+                    { text: 'أصبح مقتصرًا على تجارة الأسماك فقط', correct: false }
+                ],
+                explanation: 'صحيح! تحول الأطلنطي إلى شريان رئيسي للتجارة العالمية وازدهرت التجارة بالذهب والسلع كالسكر والقطن.'
+            },
+            {
+                id: 14,
+                round: 3,
+                type: 'mcq',
+                title: 'النتائج السياسية والتنافس الاستعماري ⚔️',
+                scenario: 'ما النتيجة السياسية المباشرة لسيطرة الدول الأوروبية على الأراضي المكتشفة في العالم الجديد؟',
+                options: [
+                    { text: 'نشوب حروب وتنافس استعماري بين إنجلترا وإسبانيا وفرنسا', correct: true },
+                    { text: 'إحلال السلام العالمي وتوحيد الدول', correct: false },
+                    { text: 'انسحاب الدول الأوروبية من المستعمرات', correct: false }
+                ],
+                explanation: 'إجابة صحيحة! أدى تنافس الدول الأوروبية لتكوين مستعمرات إلى صراعات وحروب بينها.'
+            },
+            {
+                id: 15,
+                round: 3,
+                type: 'spot_error',
+                title: 'تصحيح الآثار الاجتماعية على السكان الأصليين 🏹',
+                scenario: 'حدد النتيجة الخاطئة فيما يتعلق بأثر وصول الأوروبيين على السكان الأصليين (الهنود الحمر):',
+                options: [
+                    { text: 'تعرض السكان الأصليين للإبادة وتهجيرهم من أراضيهم', correct: false },
+                    { text: 'وفاة أعداد كبيرة منهم بسبب أوبئة كالجدري والإنفلونزا الوافدة', correct: false },
+                    { text: 'منح السكان الأصليين كامل حقوقهم واستقلالهم السياسي فوراً', correct: true }
+                ],
+                explanation: 'أحسنت! تعرض السكان الأصليون لآثار سلبية قاسية كالإبادة، التهجير، والأمراض الوافدة التي لم تكن لديهم مناعة ضدها.'
+            },
+            {
+                id: 16,
+                round: 3,
+                type: 'mcq',
+                title: 'تجارة الرقيق والمعاناة الإفريقية ⛓️',
+                scenario: 'لماذا أصبح الرقيق الإفريقي السلعة الأكثر استغلالاً بعد اكتشاف الأمريكتين؟',
+                options: [
+                    { text: 'للعمل قسراً وبظروف شاقة في المزارع والمناجم بالمستعمرات', correct: true },
+                    { text: 'تعليمهم الفنون والأدلة الجغرافية', correct: false },
+                    { text: 'لتدريبهم على قيادة السفن الحربية', correct: false }
+                ],
+                explanation: 'صحيح مع الأسف! استغلت القوى الأوروبية الصراعات لنقل الأفارقة قسراً للعمل في المزارع والمناجم.'
+            },
+            {
+                id: 17,
+                round: 3,
+                type: 'mcq',
+                title: 'سلاح ذو حدين ⚖️',
+                scenario: 'بم تفسر: "كانت الكشوف الجغرافية سلاحاً ذا حدين"؟',
+                options: [
+                    { text: 'لأنها حققت مكاسب لأوروبا لكنها تسببت بمعاناة شديدة للشعوب الإفريقية والسكان الأصليين', correct: true },
+                    { text: 'لأنها استخدمت نوعين من السفن فقط', correct: false },
+                    { text: 'لأن رحلة كولومبوس نجحت ورحلة ماجلان فشلت', correct: false }
+                ],
+                explanation: 'ممتاز! حققت الكشوف مكاسب اقتصادية وعلمية لأوروبا، لكنها دمرت مجتمعات السكان الأصليين والأفارقة.'
+            },
+            {
+                id: 18,
+                round: 3,
+                type: 'mcq',
+                title: 'المهمة النهائية للإنقاذ! 🏁',
+                scenario: 'السيارة على وشك الخروج تماماً من الحفرة! ما النتيجة العلمية الرئيسية للكشوف التي غيرت نظرية الجغرافيا؟',
+                options: [
+                    { text: 'تقديم أدلة عملية على كروية الأرض ورسم خرائط أكثر دقة للعالم', correct: true },
+                    { text: 'إثبات أن العالم يتكون من قارة واحدة فقط', correct: false },
+                    { text: 'توقف حركة الملاحة في البحار', correct: false }
+                ],
+                explanation: 'رائع جداً! أسهمت الرحلات في تطور علم الجغرافيا ورسم خرائط دقيقة للعالم والتعرف على كائنات جديدة.'
+            }
+        ];
+
+        let gameMode = 'team'; // 'team' or 'single'
+        let teams = [
+            { name: 'الفريق الأول (الفرسان)', score: 0, stars: 0, level: 1 },
+            { name: 'الفريق الثاني (المستكشفون)', score: 0, stars: 0, level: 1 }
+        ];
+        let currentTeamIndex = 0;
+        let currentQuestionIndex = 0;
+        let ropeMarksActivated = 0; // 0 to 18
+        let selectedOptionIndex = null;
+        let lastAnswerCorrect = false;
+
+        window.onload = function() {
+            buildRopeNodesUI();
+            updateLeaderboardUI();
+            updateCarPositionUI(0, false);
+            playSFX('click');
+        };
+
+        function setGameMode(mode) {
+            gameMode = mode;
+            playSFX('click');
+            const teamBtn = document.getElementById('mode-team-btn');
+            const singleBtn = document.getElementById('mode-single-btn');
+            const teamSection = document.getElementById('team-names-section');
+
+            if (mode === 'team') {
+                teamBtn.className = "p-3 rounded-xl border-2 border-amber-500 bg-amber-50 font-bold text-amber-900 text-sm flex flex-col items-center gap-1";
+                singleBtn.className = "p-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-bold text-slate-700 text-sm flex flex-col items-center gap-1";
+                teamSection.classList.remove('hidden');
+                document.getElementById('game-mode-badge').innerText = 'نمط الفرق';
+            } else {
+                singleBtn.className = "p-3 rounded-xl border-2 border-amber-500 bg-amber-50 font-bold text-amber-900 text-sm flex flex-col items-center gap-1";
+                teamBtn.className = "p-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-bold text-slate-700 text-sm flex flex-col items-center gap-1";
+                teamSection.classList.add('hidden');
+                document.getElementById('game-mode-badge').innerText = 'نمط فردي';
+            }
+        }
+
+        function openSetupModal() {
+            document.getElementById('setup-modal').classList.remove('hidden');
+            playSFX('click');
+        }
+
+        function saveSetupAndStart() {
+            playSFX('click');
+            if (gameMode === 'team') {
+                const name1 = document.getElementById('team1-input').value.trim() || 'الفريق الأول';
+                const name2 = document.getElementById('team2-input').value.trim() || 'الفريق الثاني';
+                teams = [
+                    { name: name1, score: 0, stars: 0, level: 1 },
+                    { name: name2, score: 0, stars: 0, level: 1 }
+                ];
+            } else {
+                teams = [
+                    { name: 'المستكشف Bطل الإنقاذ', score: 0, stars: 0, level: 1 }
+                ];
+            }
+            currentTeamIndex = 0;
+            document.getElementById('setup-modal').classList.add('hidden');
+            updateLeaderboardUI();
+            updateTurnIndicatorUI();
+        }
+
+        function buildRopeNodesUI() {
+            const container = document.getElementById('rope-nodes-container');
+            container.innerHTML = '';
+            for (let i = 1; i <= 18; i++) {
+                const node = document.createElement('div');
+                node.id = `rope-node-${i}`;
+                node.className = `rope-node h-6 rounded-md border border-amber-400 bg-amber-100 flex items-center justify-center text-[10px] font-black text-amber-800`;
+                node.innerText = i;
+                container.appendChild(node);
+            }
+        }
+
+        function updateLeaderboardUI() {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = '';
+
+            teams.forEach((team, idx) => {
+                const isCurrent = (idx === currentTeamIndex);
+                const card = document.createElement('div');
+                card.className = `p-2.5 rounded-xl border-2 transition-all flex items-center justify-between ${
+                    isCurrent ? 'bg-amber-100 border-amber-500 shadow-md scale-102' : 'bg-white border-amber-200 opacity-90'
+                }`;
+
+                card.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">${idx === 0 ? '🥇' : '🥈'}</span>
+                        <div>
+                            <div class="font-black text-xs sm:text-sm text-indigo-950 flex items-center gap-1">
+                                ${team.name}
+                                ${isCurrent ? '<span class="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full">دورك الآن</span>' : ''}
+                            </div>
+                            <div class="text-[10px] font-bold text-amber-700">قوة الإنقاذ: ${team.score} نقطة</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 text-amber-500 font-black text-xs">
+                        <span>⭐</span>
+                        <span>${team.stars}</span>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function updateTurnIndicatorUI() {
+            const activeTeam = teams[currentTeamIndex];
+            document.getElementById('turn-indicator').innerText = `دور: ${activeTeam.name}`;
+        }
+
+        function presentCurrentChallenge() {
+            playSFX('click');
+            if (currentQuestionIndex >= gameQuestions.length) {
+                triggerVictoryEnding();
+                return;
+            }
+
+            const q = gameQuestions[currentQuestionIndex];
+            selectedOptionIndex = null;
+
+            // Reset modal state
+            document.getElementById('challenge-title').innerText = q.title;
+            document.getElementById('challenge-subtitle').innerText = `الجولة ${q.round}: تحدي السؤال ${q.id} من 18`;
+            document.getElementById('challenge-step-badge').innerText = `التحدي ${q.id} من 18`;
+            
+            // Round Badge Header Text
+            const roundNames = ['دوافع الكشوف والعوامل', 'المستكشفون والأمريكتين وأستراليا', 'نتائج الكشوف والآثار'];
+            document.getElementById('current-round-text').innerText = `الجولة ${q.round}: ${roundNames[q.round - 1]}`;
+
+            const container = document.getElementById('challenge-body-container');
+            container.innerHTML = `
+                <div class="bg-indigo-50/80 border border-indigo-200 p-3.5 rounded-2xl">
+                    <p class="font-bold text-indigo-950 text-sm sm:text-base leading-relaxed">
+                        ${q.scenario}
+                    </p>
+                </div>
+                <div class="space-y-2" id="options-list">
+                    ${q.options.map((opt, i) => `
+                        <button onclick="selectOption(${i})" id="opt-btn-${i}" class="w-full text-right p-3 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 font-bold text-xs sm:text-sm text-slate-800 transition-all flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full border border-slate-300 flex items-center justify-center text-xs font-black bg-white">${i + 1}</span>
+                            <span class="flex-grow">${opt.text}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+
+            // Reset buttons
+            document.getElementById('feedback-box').className = 'hidden';
+            document.getElementById('submit-answer-btn').classList.remove('hidden');
+            document.getElementById('trigger-rescue-btn').classList.add('hidden');
+
+            document.getElementById('challenge-modal').classList.remove('hidden');
+        }
+
+        function selectOption(index) {
+            playSFX('click');
+            selectedOptionIndex = index;
+            const q = gameQuestions[currentQuestionIndex];
+            q.options.forEach((_, i) => {
+                const btn = document.getElementById(`opt-btn-${i}`);
+                if (i === index) {
+                    btn.className = "w-full text-right p-3 rounded-xl border-2 border-indigo-500 bg-indigo-100 font-bold text-xs sm:text-sm text-indigo-950 transition-all flex items-center gap-2 ring-2 ring-indigo-300";
+                } else {
+                    btn.className = "w-full text-right p-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-bold text-xs sm:text-sm text-slate-800 transition-all flex items-center gap-2 opacity-70";
+                }
+            });
+        }
+
+        function evaluateAnswer() {
+            if (selectedOptionIndex === null) {
+                alert("الرجاء اختيار إجابة لتأكيد القرار!");
+                return;
+            }
+
+            const q = gameQuestions[currentQuestionIndex];
+            const isCorrect = q.options[selectedOptionIndex].correct;
+            lastAnswerCorrect = isCorrect;
+
+            const feedbackBox = document.getElementById('feedback-box');
+            feedbackBox.classList.remove('hidden');
+
+            const speech = document.getElementById('speech-bubble');
+
+            if (isCorrect) {
+                playSFX('correct');
+                feedbackBox.className = "rounded-2xl p-4 border-2 border-emerald-400 bg-emerald-50 text-emerald-950 mb-4 text-center text-sm font-bold animate-fade-in";
+                feedbackBox.innerHTML = `
+                    <div class="text-xl mb-1">🎉 إجابة رائعة وتصرف صحيحة!</div>
+                    <p class="text-xs text-emerald-800">${q.explanation}</p>
+                `;
+                
+                // Show speech popup
+                speech.innerText = "Wow! Great! شكراً لكم! 🌟";
+                speech.classList.remove('hidden');
+
+                // Update team stats
+                teams[currentTeamIndex].score += 100;
+                teams[currentTeamIndex].stars += 1;
+            } else {
+                playSFX('wrong');
+                feedbackBox.className = "rounded-2xl p-4 border-2 border-rose-400 bg-rose-50 text-rose-950 mb-4 text-center text-sm font-bold animate-fade-in";
+                feedbackBox.innerHTML = `
+                    <div class="text-xl mb-1">⚠️ انزلقت السيارة قليلاً!</div>
+                    <p class="text-xs text-rose-800">حاولوا مجدداً! ${q.explanation}</p>
+                `;
+
+                // Show speech popup
+                speech.innerText = "Help! Oops! انتبهوا! 🆘";
+                speech.classList.remove('hidden');
+            }
+
+            updateLeaderboardUI();
+
+            // Hide Submit button and show Suspense Pull button "شاهد حركة الإنقاذ"
+            document.getElementById('submit-answer-btn').classList.add('hidden');
+            document.getElementById('trigger-rescue-btn').classList.remove('hidden');
+        }
+
+        function executeRescueAnimation() {
+            playSFX('click');
+            document.getElementById('challenge-modal').classList.add('hidden');
+
+            const carContainer = document.getElementById('car-container');
+            const craneSvg = document.getElementById('crane-svg');
+            const ropeLine = document.getElementById('rope-line');
+            const speech = document.getElementById('speech-bubble');
+
+            if (lastAnswerCorrect) {
+                // Correct: Activate rope node and pull car upward
+                playSFX('rope_pull');
+                ropeMarksActivated = Math.min(18, ropeMarksActivated + 1);
+
+                // Highlight next rope node
+                const node = document.getElementById(`rope-node-${ropeMarksActivated}`);
+                if (node) node.classList.add('active');
+
+                // Rope pull animation
+                ropeLine.classList.add('animate-rope-pull');
+                setTimeout(() => ropeLine.classList.remove('animate-rope-pull'), 800);
+
+                // Calculate vertical height lift (0 to 18 steps)
+                updateCarPositionUI(ropeMarksActivated, true);
+
+            } else {
+                // Wrong: Shake rope and slide car back slightly
+                playSFX('wrong');
+                ropeLine.classList.add('animate-rope-shake');
+                carContainer.classList.add('animate-car-slide');
+
+                setTimeout(() => {
+                    ropeLine.classList.remove('animate-rope-shake');
+                    carContainer.classList.remove('animate-car-slide');
+                }, 600);
+            }
+
+            // Hide speech bubble after delay
+            setTimeout(() => {
+                speech.classList.add('hidden');
+            }, 2500);
+
+            // Advance Question / Turn Index
+            currentQuestionIndex++;
+            if (gameMode === 'team') {
+                currentTeamIndex = (currentTeamIndex + 1) % teams.length;
+            }
+            updateTurnIndicatorUI();
+            updateLeaderboardUI();
+
+            // Check if final question reached
+            if (currentQuestionIndex >= gameQuestions.length || ropeMarksActivated >= 18) {
+                setTimeout(triggerVictoryEnding, 1200);
+            }
+        }
+
+        function updateCarPositionUI(stepCount, isAnimate) {
+            const carContainer = document.getElementById('car-container');
+            
+            // Map 0 - 18 steps to translateY pixel offset (from +30px deep hole to -110px top out)
+            const maxLift = -110;
+            const startDepth = 30;
+            const liftPerStep = (startDepth - maxLift) / 18;
+            
+            const currentY = startDepth - (stepCount * liftPerStep);
+            carContainer.style.transform = `translateY(${currentY}px)`;
+
+            // Update Progress Percentage Bar
+            const percent = Math.round((stepCount / 18) * 100);
+            document.getElementById('rescue-percent-text').innerText = `${percent}%`;
+            document.getElementById('main-progress-bar').style.width = `${percent}%`;
+            document.getElementById('rope-counter').innerText = `${stepCount} / 18 عقدة`;
+
+            // Stage Highlights (1, 2, 3, 4)
+            for (let s = 1; s <= 4; s++) {
+                const stageBox = document.getElementById(`stage-box-${s}`);
+                if (percent >= s * 25) {
+                    stageBox.className = "h-8 rounded-lg border border-emerald-500 bg-emerald-500 text-white flex items-center justify-center text-xs font-black shadow-md";
+                }
+            }
+        }
+
+        function triggerVictoryEnding() {
+            playSFX('victory');
+            
+            // Launch Confetti Cannon
+            try {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            } catch(e) {}
+
+            const victoryStats = document.getElementById('victory-stats');
+            victoryStats.innerHTML = teams.map((t, i) => `
+                <div class="flex justify-between items-center border-b border-amber-100 pb-1">
+                    <span>🏆 ${t.name}</span>
+                    <span class="text-amber-600 font-black">${t.score} نقطة (${t.stars} ⭐)</span>
+                </div>
+            `).join('');
+
+            document.getElementById('victory-modal').classList.remove('hidden');
+        }
+
+        function resetWholeGame() {
+            playSFX('click');
+            currentQuestionIndex = 0;
+            ropeMarksActivated = 0;
+            currentTeamIndex = 0;
+            teams.forEach(t => { t.score = 0; t.stars = 0; });
+
+            buildRopeNodesUI();
+            updateCarPositionUI(0, false);
+            updateLeaderboardUI();
+            updateTurnIndicatorUI();
+
+            document.getElementById('victory-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
